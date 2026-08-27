@@ -220,3 +220,24 @@ Na seção de concentração da formação, todos os candidatos novos carregados
 ## Seleção única de docentes para inclusão
 
 A primeira coluna do ranking é **Selecionados/inclusos**. Os docentes marcados nessa coluna são usados simultaneamente na comparação detalhada e nas projeções dos painéis de linhas de pesquisa e de concentração da formação. A seção de formação não possui uma seleção própria: o painel **Após inclusões** compara diretamente a composição atual com os docentes selecionados no ranking.
+
+
+### v0.3.14
+Nos gráficos **Docentes × Qualis dos artigos** e **Produção com discentes × Qualis dos artigos**, o índice exibido ao lado do nome é o **IndArt** (somente artigos). No segundo gráfico, o IndArt é recalculado apenas com artigos que possuem ao menos um discente PPG associado. Livros, capítulos e produtos técnicos não entram nesses dois índices.
+
+
+## v0.3.15
+- No ranking, A1–A4 passa a mostrar o IndArt calculado apenas com artigos A1–A4 e o percentual desse índice sobre o IndProd total.
+- Pesos iniciais do escore: Qualidade Qualis 75, IndProd 10, Orientações 10, Projetos/captação 3 e IQTF 2.
+- Qualidade Qualis aparece primeiro na sequência dos pesos.
+
+## Normalização do escore comparativo (v0.3.17)
+
+- **Qualidade Qualis:** já está em escala 0–100 e corresponde ao percentual do IndProd proveniente de artigos A1–A4.
+- **IndProdScore:** permanece no modelo anterior: IndProd mínimo = 50 pontos; 2× o mínimo = 100 pontos; valores superiores permanecem em 100.
+- **IQTF:** `100 × IQTF_i / IQTF_máximo` no conjunto carregado.
+- **Orientações:** `100 × N_i / N_máximo` no conjunto carregado (mantendo o mesmo número de titulados usado pelo componente Orientações da versão anterior).
+- **Projetos:** `100 × N_projetos_i / N_projetos_máximo`.
+- **Captação:** aplica-se `log(1 + valor)` e depois `100 × valor_log_i / valor_log_máximo`.
+- **Projetos/captação:** 35% do escore normalizado de número de projetos + 65% do escore normalizado de captação.
+- O escore final é a média ponderada dos componentes, dividida pela soma dos pesos ativos.

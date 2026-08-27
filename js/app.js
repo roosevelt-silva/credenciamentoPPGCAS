@@ -471,10 +471,15 @@ function computeIndicators(raw,cfg){
   const indArt=artPoints/yearsEq, indLiv=bookPoints/yearsEq, indCap=chapPoints/yearsEq, indTec=techPoints/yearsEq;
   const indProd=indArt+indLiv+indCap+indTec;
   const iqtf=iqtfPoints/yearsEq;
-  const topCount=articles.filter(p=>['A1','A2','A3','A4'].includes(p.qualis)).length;
+  const topArticles=articles.filter(p=>['A1','A2','A3','A4'].includes(p.qualis));
+  const topCount=topArticles.length;
+  const topArtPoints=topArticles.reduce((s,p)=>s+(ARTICLE_W[p.qualis]||0),0);
+  const topIndArt=topArtPoints/yearsEq;
+  const topIndArtPctIndProd=indProd>0?(topIndArt/indProd*100):0;
   const avgArticleWeight=articles.length?articles.reduce((s,p)=>s+(ARTICLE_W[p.qualis]||0),0)/articles.length:0;
   const topPct=articles.length?topCount/articles.length*100:0;
-  const qualisQuality=(avgArticleWeight*100*.65)+(topPct*.35);
+  // Qualidade Qualis usada no escore: percentual do IndProd proveniente de artigos A1–A4.
+  const qualisQuality=topIndArtPctIndProd;
   const prodAderente=period.filter(p=>validText(p.line)).length;
   const projectAdherent=raw.projects.filter(p=>validText(p.line)).length;
   const projectFunding=raw.projects.reduce((s,p)=>s+p.value,0);
@@ -493,11 +498,11 @@ function computeIndicators(raw,cfg){
   const dominantLine = line1Prod.indProd>line2Prod.indProd ? 1 : line2Prod.indProd>line1Prod.indProd ? 2 : line1Count>line2Count ? 1 : line2Count>line1Count ? 2 : 0;
 
   return {period,valid,articles,articlesDeclared,articlesSemQualis,qualisCounts,artPoints,bookPoints,chapPoints,techPoints,artGlosa,techGlosa,chapterReviewCount,
-    indArt,indLiv,indCap,indTec,indProd,iqtf,topCount,topPct,avgArticleWeight,qualisQuality,prodAderente,projectAdherent,
+    indArt,indLiv,indCap,indTec,indProd,iqtf,topCount,topIndArt,topIndArtPctIndProd,topPct,avgArticleWeight,qualisQuality,prodAderente,projectAdherent,
     projectFunding,titMD,iqtfApplicable,essentialPendingCount,pendingItems,warnings,yearsEq,
     studentIndProd:studentProd.indProd,studentIndArt:studentProd.indArt,studentIndLiv:studentProd.indLiv,studentIndCap:studentProd.indCap,studentIndTec:studentProd.indTec,
     studentQualisCounts:studentProd.qualisCounts,studentArticlesSemQualis:studentProd.articlesSemQualis,studentProducts:studentProd.period,
-    line1IndProd:line1Prod.indProd,line2IndProd:line2Prod.indProd,line1QualisCounts:line1Prod.qualisCounts,line2QualisCounts:line2Prod.qualisCounts,
+    line1IndProd:line1Prod.indProd,line2IndProd:line2Prod.indProd,line1IndArt:line1Prod.indArt,line2IndArt:line2Prod.indArt,line1QualisCounts:line1Prod.qualisCounts,line2QualisCounts:line2Prod.qualisCounts,
     line1ArticlesSemQualis:line1Prod.articlesSemQualis,line2ArticlesSemQualis:line2Prod.articlesSemQualis,line1ProductCount:line1Count,line2ProductCount:line2Count,dominantLine};
 }
 
@@ -528,16 +533,29 @@ function evaluateAll(){
 
   const fundingLogs=evaluated.map(c=>Math.log1p(Math.max(0,c.projectFunding)));
   const projCounts=evaluated.map(c=>c.projects.length);
-  const minmax=(v,arr)=>{ const lo=Math.min(...arr),hi=Math.max(...arr); if(!arr.length)return 0; if(hi===lo) return hi===0?0:50; return (v-lo)/(hi-lo)*100; };
-  const w={ind:num($('#wInd')?.value??45),qualis:num($('#wQualis')?.value??25),iqtf:num($('#wIQTF')?.value??10),orient:num($('#wOrient')?.value??10),proj:num($('#wProj')?.value??10)};
+  const iqtfValues=evaluated.map(c=>Math.max(0,c.iqtf||0));
+  const orientValues=evaluated.map(c=>Math.max(0,c.titulados.length));
+  // Normalização comparativa X/Xmax em escala 0–100 para os componentes quantitativos.
+  // IndProdScore é mantido no modelo de referência regulamentar já usado pelo portal.
+  const relativeToMax=(v,arr)=>{
+    const max=Math.max(0,...arr.map(x=>Number.isFinite(x)?x:0));
+    if(max<=0) return 0;
+    return Math.max(0,Math.min(100,(v/max)*100));
+  };
+  const w={ind:num($('#wInd')?.value??10),qualis:num($('#wQualis')?.value??75),iqtf:num($('#wIQTF')?.value??2),orient:num($('#wOrient')?.value??10),proj:num($('#wProj')?.value??3)};
   const totalW=Object.values(w).reduce((a,b)=>a+b,0)||1;
   for(const c of evaluated){
+    // Mantido: mínimo regulamentar = 50 pontos; 2× o mínimo = 100 pontos; teto em 100.
     const indScore=Math.min(100,c.indProd/Math.max(cfg.minIndProd*2,.01)*100);
+    // Já é naturalmente 0–100: % do IndProd proveniente de artigos A1–A4.
     const qScore=Math.max(0,Math.min(100,c.qualisQuality));
-    const iqScore=c.iqtf>0?Math.min(100,c.iqtf/Math.max(cfg.minIQTF*2,.01)*100):0;
-    const orientScore=Math.min(100,c.titulados.length/6*100);
-    const projScore=(minmax(c.projects.length,projCounts)*.35)+(minmax(Math.log1p(Math.max(0,c.projectFunding)),fundingLogs)*.65);
-    c.components={indScore,qScore,iqScore,orientScore,projScore};
+    // Demais componentes: comparação relativa ao maior valor observado no grupo carregado.
+    const iqScore=relativeToMax(Math.max(0,c.iqtf||0),iqtfValues);
+    const orientScore=relativeToMax(Math.max(0,c.titulados.length),orientValues);
+    const projCountScore=relativeToMax(Math.max(0,c.projects.length),projCounts);
+    const fundingScore=relativeToMax(Math.log1p(Math.max(0,c.projectFunding)),fundingLogs);
+    const projScore=(projCountScore*.35)+(fundingScore*.65);
+    c.components={indScore,qScore,iqScore,orientScore,projScore,projCountScore,fundingScore};
     c.score=(w.ind*indScore+w.qualis*qScore+w.iqtf*iqScore+w.orient*orientScore+w.proj*projScore)/totalW;
     c.qualification=qualification(c);
   }
@@ -613,7 +631,7 @@ function renderRanking(){
       <td>${c.essentialPendingCount?`<span class="badge warn">! ${c.essentialPendingCount} pendência${c.essentialPendingCount===1?'':'s'}</span>`:'<span class="badge ok">✓ Nenhuma</span>'}</td>
       <td><div class="score">${fmt(c.score,1)}</div><div class="bar"><i style="width:${Math.max(0,Math.min(100,c.score))}%"></i></div></td>
       <td>${esc(c.qualification)}</td><td class="num"><b>${fmt(c.indProd)}</b></td><td class="num">${fmt(c.indArt)}</td>
-      <td class="num">${pct(c.topPct)}</td><td class="num">${fmt(c.avgArticleWeight,3)}</td><td class="num">${fmt(c.iqtf)}</td>
+      <td class="num"><b>${pct(c.topIndArtPctIndProd)}</b></td><td class="num">${fmt(c.avgArticleWeight,3)}</td><td class="num">${fmt(c.iqtf)}</td>
       <td class="num">${c.titulados.length}</td><td class="num">${c.projects.length}</td><td class="num">${money(c.projectFunding)}</td>
     </tr>`;
   }).join('');
@@ -644,7 +662,7 @@ function drawQualis(){
 function drawQualisHeatmap(){
   const canvas=$('#chartQualisHeatmap'); if(!canvas) return;
   const cols=[...Q_ORDER,'SEM QUALIS'];
-  const arr=state.candidates.slice().sort((a,b)=>b.indProd-a.indProd);
+  const arr=state.candidates.slice().sort((a,b)=>b.indArt-a.indArt);
   const rowH=26;
   const displayHeight=Math.max(240,68 + arr.length*rowH);
   const {ctx,w,h}=setupCanvas(canvas,displayHeight);
@@ -659,7 +677,7 @@ function drawQualisHeatmap(){
   arr.forEach((cand,i)=>{
     const y=top+i*cellH+cellH/2;
     const base=cand.name.length>27?cand.name.slice(0,25)+'…':cand.name;
-    const nm=`${base} (${fmt(cand.indProd)})`;
+    const nm=`${base} (${fmt(cand.indArt)})`;
     ctx.fillStyle='#28443a';
     ctx.fillText(nm,left-8,y);
   });
@@ -667,7 +685,7 @@ function drawQualisHeatmap(){
   ctx.textAlign='center';
   ctx.fillStyle='#596b62';
   ctx.font='10px Arial';
-  ctx.fillText('Docente (IndProd)',Math.max(70,left/2),16);
+  ctx.fillText('Docente (IndArt)',Math.max(70,left/2),16);
   cols.forEach((col,j)=>{
     const x=left+j*cellW+cellW/2;
     ctx.fillStyle='#596b62';
@@ -701,7 +719,7 @@ function drawQualisHeatmap(){
 function drawStudentQualisHeatmap(){
   const canvas=$('#chartStudentQualisHeatmap'); if(!canvas) return;
   const cols=[...Q_ORDER,'SEM QUALIS'];
-  const arr=state.candidates.slice().sort((a,b)=>b.studentIndProd-a.studentIndProd);
+  const arr=state.candidates.slice().sort((a,b)=>b.studentIndArt-a.studentIndArt);
   const rowH=26;
   const displayHeight=Math.max(240,68 + arr.length*rowH);
   const {ctx,w,h}=setupCanvas(canvas,displayHeight);
@@ -716,7 +734,7 @@ function drawStudentQualisHeatmap(){
   arr.forEach((cand,i)=>{
     const y=top+i*cellH+cellH/2;
     const base=cand.name.length>25?cand.name.slice(0,23)+'…':cand.name;
-    const nm=`${base} (${fmt(cand.studentIndProd)})`;
+    const nm=`${base} (${fmt(cand.studentIndArt)})`;
     ctx.fillStyle='#28443a';
     ctx.fillText(nm,left-8,y);
   });
@@ -724,7 +742,7 @@ function drawStudentQualisHeatmap(){
   ctx.textAlign='center';
   ctx.fillStyle='#596b62';
   ctx.font='10px Arial';
-  ctx.fillText('Docente (IndProd com discentes)',Math.max(95,left/2),16);
+  ctx.fillText('Docente (IndArt com discentes)',Math.max(95,left/2),16);
   cols.forEach((col,j)=>{
     const x=left+j*cellW+cellW/2;
     ctx.fillStyle='#596b62';
@@ -752,13 +770,13 @@ function drawStudentQualisHeatmap(){
   ctx.fillStyle='#596b62';
   ctx.font='11px Arial';
   ctx.textAlign='left';
-  ctx.fillText('Somente artigos com pelo menos um discente PPG associado; o IndProd entre parênteses usa somente produtos com discentes.',left,h-8);
+  ctx.fillText('Somente artigos com pelo menos um discente PPG associado; o IndArt entre parênteses usa somente esses artigos.',left,h-8);
 }
 
 
 function drawLineQualisHeatmap(){
   const canvas=$('#chartLineQualis'); if(!canvas) return;
-  const arr=state.candidates.slice().sort((a,b)=>b.indProd-a.indProd);
+  const arr=state.candidates.slice().sort((a,b)=>(b.line1IndArt+b.line2IndArt)-(a.line1IndArt+a.line2IndArt));
   const cols=[];
   [1,2].forEach(line=>Q_ORDER.forEach(q=>cols.push({line,q})));
   const rowH=26, displayHeight=Math.max(250,82+arr.length*rowH);
@@ -771,17 +789,17 @@ function drawLineQualisHeatmap(){
   arr.forEach((c,i)=>{
     const y=top+i*cellH+cellH/2;
     const base=c.name.length>26?c.name.slice(0,24)+'…':c.name;
-    const label=`${base} · L1 ${fmt(c.line1IndProd)} | L2 ${fmt(c.line2IndProd)}`;
+    const label=`${base} · L1 ${fmt(c.line1IndArt)} | L2 ${fmt(c.line2IndArt)}`;
     ctx.fillStyle='#28443a';ctx.fillText(label,left-8,y);
   });
   ctx.textAlign='center';ctx.font='10px Arial';ctx.fillStyle='#596b62';
-  ctx.fillText('Docente · IndProd por linha',Math.max(100,left/2),14);
+  ctx.fillText('Docente · IndArt por linha',Math.max(100,left/2),14);
   ctx.fillText('Linha 1 · Mecanismos e processos biológicos',left+cellW*4,14);
   ctx.fillText('Linha 2 · Promoção/Diagnóstico/Tratamento',left+cellW*12,14);
   cols.forEach((col,j)=>ctx.fillText(col.q,left+j*cellW+cellW/2,35));
   arr.forEach((c,i)=>cols.forEach((col,j)=>{const count=counts(c,col),t=count/max,alpha=.14+.78*t;const x=left+j*cellW,y=top+i*cellH;ctx.fillStyle=count===0?'#f3f6f4':`rgba(11,107,69,${alpha})`;ctx.fillRect(x,y,cellW-1,cellH-1);ctx.strokeStyle='#fff';ctx.strokeRect(x,y,cellW-1,cellH-1);if(count){ctx.fillStyle=t>.58?'#fff':'#17332a';ctx.font='9px Arial';ctx.fillText(String(count),x+cellW/2,y+cellH/2);}}));
   ctx.strokeStyle='#9db5aa';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(left+cellW*8,30);ctx.lineTo(left+cellW*8,h-bottom);ctx.stroke();
-  ctx.textAlign='left';ctx.fillStyle='#596b62';ctx.font='10px Arial';ctx.fillText('Cada célula mostra o nº de artigos; ao lado do nome aparecem os IndProd calculados separadamente para Linha 1 e Linha 2.',left,h-8);
+  ctx.textAlign='left';ctx.fillStyle='#596b62';ctx.font='10px Arial';ctx.fillText('Cada célula mostra o nº de artigos; ao lado do nome aparecem os IndArt calculados separadamente para Linha 1 e Linha 2.',left,h-8);
 }
 
 function drawDoctorateAreaChart(){
@@ -1006,7 +1024,7 @@ function renderComparison(){
     <div class="metric"><span>Escore</span><b>${fmt(c.score,1)}</b></div><div class="metric"><span>Pendências de dados</span><b>${c.essentialPendingCount}</b></div>
     <div class="metric"><span>IndProd</span><b>${fmt(c.indProd)}</b></div>
     <div class="metric"><span>IndProd com discentes</span><b>${fmt(c.studentIndProd)}</b></div>
-    <div class="metric"><span>IndArt</span><b>${fmt(c.indArt)}</b></div><div class="metric"><span>A1–A4</span><b>${pct(c.topPct)}</b></div>
+    <div class="metric"><span>IndArt</span><b>${fmt(c.indArt)}</b></div><div class="metric"><span>A1–A4 (% do IndProd)</span><b>${pct(c.topIndArtPctIndProd)}</b></div>
     <div class="metric"><span>Qualis médio</span><b>${fmt(c.avgArticleWeight,3)}</b></div><div class="metric"><span>IQTF</span><b>${fmt(c.iqtf)}</b></div>
     <div class="metric"><span>Titulados</span><b>${c.titulados.length}</b></div><div class="metric"><span>Projetos</span><b>${c.projects.length}</b></div>
     <div class="metric"><span>Captação</span><b>${money(c.projectFunding)}</b></div><div class="metric"><span>Infraestrutura</span><b>${money(c.infrastructure.equipmentValue)}</b></div>
@@ -1049,8 +1067,8 @@ async function importFiles(files){
 }
 
 function exportCSV(){
-  const rows=[['Posição','Docente','Área do doutorado','Linha predominante','Situação','Pendências de dados','Detalhe das pendências','Escore comparativo','Qualificação','IndProd','IndProd com discentes','IndArt','IndLiv','IndCap','IndTec','A1-A4 (%)','Qualis médio artigos','Artigos SEM QUALIS','IQTF','Titulados','Projetos','Captação (R$)','Arquivo']];
-  sortedCandidates().forEach((c,i)=>rows.push([i+1,c.name,c.doctorateArea||'Não informado',c.dominantLine?('Linha '+c.dominantLine):'Não definida',c.reg.label,c.essentialPendingCount,c.pendingItems.map(x=>`Produto ${x.product.num}: ${x.reason}`).join(' | '),fmt(c.score,1),c.qualification,fmt(c.indProd),fmt(c.studentIndProd),fmt(c.indArt),fmt(c.indLiv),fmt(c.indCap),fmt(c.indTec),fmt(c.topPct,1),fmt(c.avgArticleWeight,3),c.articlesSemQualis.length,fmt(c.iqtf),c.titulados.length,c.projects.length,fmt(c.projectFunding,2),c.fileName]));
+  const rows=[['Posição','Docente','Área do doutorado','Linha predominante','Situação','Pendências de dados','Detalhe das pendências','Escore comparativo','Qualificação','IndProd','IndProd com discentes','IndArt','IndLiv','IndCap','IndTec','A1-A4 (% do IndProd)','Qualis médio artigos','Artigos SEM QUALIS','IQTF','Titulados','Projetos','Captação (R$)','Arquivo']];
+  sortedCandidates().forEach((c,i)=>rows.push([i+1,c.name,c.doctorateArea||'Não informado',c.dominantLine?('Linha '+c.dominantLine):'Não definida',c.reg.label,c.essentialPendingCount,c.pendingItems.map(x=>`Produto ${x.product.num}: ${x.reason}`).join(' | '),fmt(c.score,1),c.qualification,fmt(c.indProd),fmt(c.studentIndProd),fmt(c.indArt),fmt(c.indLiv),fmt(c.indCap),fmt(c.indTec),fmt(c.topIndArtPctIndProd,1),fmt(c.avgArticleWeight,3),c.articlesSemQualis.length,fmt(c.iqtf),c.titulados.length,c.projects.length,fmt(c.projectFunding,2),c.fileName]));
   const csv='\ufeff'+rows.map(r=>r.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n'); const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='PPGCAS_comparacao_credenciamento.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 
