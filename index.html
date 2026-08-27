@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PPGCAS · Analisador de Credenciamento e Recredenciamento Docente</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap header-grid">
+      <div class="brand">
+        <div class="logo">PPG<br>CAS</div>
+        <div><h1>Analisador de Credenciamento e Recredenciamento Docente do PPGCAS</h1><p>PPGCAS · análise conjunta das planilhas de credenciamento e recredenciamento</p></div>
+      </div>
+      <div class="privacy">🔒 Processamento local · nenhuma planilha é enviada</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card panel upload-panel">
+      <h2>1. Importe as planilhas dos candidatos</h2>
+      <p class="sub">Selecione todas as planilhas preenchidas no modelo de credenciamento do PPGCAS. O sistema recalcula os indicadores diretamente dos produtos e Qualis informados em cada arquivo.</p>
+      <div class="upload-grid">
+        <div>
+          <div id="dropzone" class="dropzone">
+            <div><strong>Arraste aqui todas as planilhas</strong><small>ou clique em “Selecionar planilhas” · formatos .xlsx e .xlsm</small></div>
+          </div>
+          <input id="files" type="file" multiple accept=".xlsx,.xlsm" hidden />
+          <div class="actions">
+            <button id="choose" class="btn primary">Selecionar planilhas</button>
+            <button id="clear" class="btn danger">Limpar</button>
+          </div>
+          <div id="fileList" class="file-list"></div>
+        </div>
+        <div>
+          <div class="config">
+            <div class="field"><label>Data de referência</label><input id="refDate" type="date"></div>
+            <div class="field"><label>IndProd mínimo</label><input id="minIndProd" type="number" min="0" step="0.05" value="1.60"></div>
+            <div class="field"><label>IQTF mínimo</label><input id="minIQTF" type="number" min="0" step="0.01" value="0.25"></div>
+          </div>
+          <p class="note"><b>Período:</b> três anos completos anteriores + meses anteriores ao mês da solicitação (36–47 meses). Como a planilha informa o ano do produto, os produtos do ano corrente são considerados conforme foram cadastrados pelo docente.</p>
+          <p class="note"><b>Qualis:</b> o cálculo usa o Qualis preenchido pelo próprio docente na aba <code>5_Produtos</code>. Artigos sem Qualis permanecem na produção como <b>SEM QUALIS</b>, com peso zero. O portal não substitui os valores por outra base.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="hidden">
+      <div class="kpis">
+        <div class="card kpi"><span>Candidatos</span><b id="kCandidates">0</b><small>planilhas válidas</small></div>
+        <div class="card kpi"><span>Sem pendência</span><b id="kEligible">0</b><small>critérios mensuráveis</small></div>
+        <div class="card kpi"><span>Mediana IndProd</span><b id="kMedian">0,00</b><small>grupo analisado</small></div>
+        <div class="card kpi"><span>Mediana IQTF</span><b id="kIQTF">0,00</b><small>grupo analisado</small></div>
+        <div class="card kpi"><span>Projetos informados</span><b id="kFunding">R$ 0</b><small>recursos declarados</small></div>
+      </div>
+
+      <section class="card panel weights-panel">
+        <h2>2. Critérios do escore comparativo</h2>
+        <p class="sub">O escore abaixo é um recurso de apoio à decisão e <b>não faz parte da Resolução</b>. Altere os pesos conforme a estratégia do PPGCAS. A elegibilidade regulamentar permanece separada.</p>
+        <div class="weights">
+          <div class="field"><label>IndProd (%)</label><input class="weight" id="wInd" type="number" min="0" value="45"></div>
+          <div class="field"><label>Qualidade Qualis (%)</label><input class="weight" id="wQualis" type="number" min="0" value="25"></div>
+          <div class="field"><label>IQTF (%)</label><input class="weight" id="wIQTF" type="number" min="0" value="10"></div>
+          <div class="field"><label>Orientações (%)</label><input class="weight" id="wOrient" type="number" min="0" value="10"></div>
+          <div class="field"><label>Projetos/captação (%)</label><input class="weight" id="wProj" type="number" min="0" value="10"></div>
+        </div>
+        <p class="note">Qualidade Qualis considera a média dos pesos dos artigos e a proporção nos estratos A1–A4. Projetos/captação usa comparação relativa no grupo, com transformação logarítmica do valor declarado para reduzir o efeito de valores extremos.</p>
+      </section>
+
+      <section class="card panel">
+        <div class="toolbar">
+          <div class="left">
+            <div><h2 style="margin:0">3. Ranking e qualificação</h2><p class="sub" style="margin:3px 0 0">Marque os docentes que pretende selecionar/incluir. A mesma seleção será usada nas projeções dos painéis 4 e 5 e na comparação detalhada.</p></div>
+          </div>
+          <div class="right">
+            <div class="field"><label>Ordenar por</label><select id="sortBy"><option value="score">Escore comparativo</option><option value="indProd">IndProd</option><option value="qualisQuality">Qualidade Qualis</option><option value="iqtf">IQTF</option><option value="funding">Captação</option></select></div>
+            <button id="exportCsv" class="btn blue">Exportar CSV</button>
+            <button id="print" class="btn">Imprimir / PDF</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="rankingTable">
+            <thead><tr>
+              <th class="select-col">Selecionados</th><th>#</th><th>Docente</th><th>Situação</th><th>Pendências</th><th>Escore</th><th>Qualificação</th>
+              <th class="num">IndProd</th><th class="num">IndArt</th><th class="num">A1–A4</th><th class="num">Qualis médio</th><th class="num">IQTF</th><th class="num">Titulados</th><th class="num">Projetos</th><th class="num">Captação</th>
+            </tr></thead><tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="charts">
+        <section class="card chart-card"><h3>IndProd por docente</h3><canvas id="chartIndProd" width="900" height="320"></canvas></section>
+        <section class="card chart-card"><h3>Distribuição Qualis dos artigos</h3><canvas id="chartQualis" width="620" height="320"></canvas></section>
+        <section class="card chart-card wide"><h3>Docentes × Qualis dos artigos</h3><canvas id="chartQualisHeatmap" width="1100" height="420"></canvas></section>
+        <section class="card chart-card wide"><h3>Produção com discentes × Qualis dos artigos</h3><canvas id="chartStudentQualisHeatmap" width="1100" height="420"></canvas></section>
+        <section class="card chart-card wide"><h3>Produção por linha de pesquisa × Qualis</h3><canvas id="chartLineQualis" width="1250" height="460"></canvas></section>
+        <section class="card chart-card wide"><h3>Áreas do título de doutorado dos candidatos</h3><canvas id="chartDoctorateArea" width="1050" height="420"></canvas></section>
+        <section class="card chart-card"><h3>Orientandos e titulados</h3><canvas id="chartOrientacaoHeatmap" width="700" height="420"></canvas></section>
+        <section class="card chart-card"><h3>Projetos e valores</h3><canvas id="chartProjetosHeatmap" width="700" height="420"></canvas></section>
+      </div>
+
+      <section id="lineImpactPanel" class="card panel" style="margin-top:20px">
+        <div class="toolbar">
+          <div class="left"><div><h2 style="margin:0">4. Impacto na composição das linhas de pesquisa</h2><p class="sub" style="margin:3px 0 0">Simule a entrada dos docentes marcados como “Selecionados” no ranking. Esta análise representa o equilíbrio interno das linhas do PPGCAS e não aplica os limites CAPES de 60%/80%, que são referentes à formação/titulação.</p></div></div>
+          <div class="right">
+            <div class="field"><label>Base atual do PPGCAS</label><select id="rosterBase"><option value="permanent">Docentes permanentes</option><option value="all">Permanentes + colaboradores</option></select></div>
+          </div>
+        </div>
+        <div class="impact-grid"><div><h3>Composição atual</h3><div id="currentLineSummary"></div></div><div><h3>Após docentes selecionados</h3><div id="projectedLineSummary"></div></div></div>
+        <p class="note">Base institucional pré-carregada a partir da página oficial “Docentes e Pesquisadores” do PPGCAS. O HHI é apresentado apenas como indicador complementar de equilíbrio entre as linhas.</p>
+        <h3>Impacto individual de cada candidato</h3>
+        <div class="table-wrap"><table id="lineImpactTable" style="min-width:760px"><thead><tr><th>Docente</th><th>Linha considerada</th><th class="num">Linha 1 após entrada</th><th class="num">Linha 2 após entrada</th><th>Maior proporção</th></tr></thead><tbody></tbody></table></div>
+      </section>
+
+      <section id="formationImpactPanel" class="card panel" style="margin-top:20px">
+        <div class="toolbar">
+          <div class="left"><div><h2 style="margin:0">5. Concentração da formação do corpo docente permanente</h2><p class="sub" style="margin:3px 0 0">Analisa a formação/titulação segundo os dois limites da Área Interdisciplinar da CAPES e permite incluir os novos docentes diretamente na projeção.</p></div></div>
+          <div class="right">
+            <div class="field"><label>Limite por Área disciplinar (%)</label><input id="disciplinaryLimit" type="number" min="0" max="100" step="1" value="60"></div>
+            <div class="field"><label>Limite por Grande Área (%)</label><input id="greatAreaLimit" type="number" min="0" max="100" step="1" value="80"></div>
+          </div>
+        </div>
+        <p class="note"><b>CAPES:</b> até 60% dos docentes permanentes podem ter formação/titulação em Áreas disciplinares abrangidas por outra Área de Avaliação, diferente da Interdisciplinar; e até 80% em uma única Grande Área, diferente da Multidisciplinar. Os dois limiares acima são editáveis para permitir atualização futura.</p>
+        <div class="impact-grid"><div><h3>Base atual classificada</h3><div id="currentFormationSummary"></div></div><div><h3>Após inclusões</h3><div id="projectedFormationSummary"></div></div></div>
+
+        <div class="formation-admin-link">
+          <div style="min-width:0;flex:1"><b>Formação dos docentes permanentes atuais</b><p class="note">A classificação institucional é lida diretamente de <code>data/formacao_docentes.csv</code> sempre que o analisador inicia. A leitura é feita sem cache.</p><p id="formationStorageStatus" class="note" style="margin-bottom:0"></p></div>
+          <div class="actions" style="margin-top:0"><button id="reloadFormationCsv" class="btn" type="button">Recarregar base agora</button><button id="openFormationCsvLocal" class="btn" type="button">Abrir CSV local</button><a class="btn blue" href="formacao.html">Editar base de formação</a><input id="formationCsvLocalFile" type="file" accept=".csv,text/csv" hidden></div>
+        </div>
+
+        <h3>Impacto individual dos candidatos na concentração da formação</h3>
+        <div class="table-wrap"><table id="formationImpactTable" style="min-width:1120px"><thead><tr><th>Docente</th><th>Área do doutorado</th><th>Grande Área (CNPq)</th><th>Área (CNPq)</th><th class="num">Maior Área disciplinar</th><th class="num">Maior Grande Área</th><th>Situação</th></tr></thead><tbody></tbody></table></div>
+      </section>
+
+      <section id="comparisonPanel" class="card panel hidden" style="margin-top:20px">
+        <h2>6. Comparação lado a lado</h2><p class="sub">Os valores abaixo vêm das planilhas selecionadas e dos cálculos refeitos pelo portal.</p>
+        <div id="compareGrid" class="compare-grid"></div>
+      </section>
+
+      <section id="detailsPanel" style="margin-top:20px"></section>
+    </section>
+
+    <div class="footer">PPGCAS · ferramenta de apoio à Comissão Administrativa. A decisão de credenciamento continua sendo colegiada e deve considerar a Resolução e o planejamento estratégico do Programa.</div>
+  </main>
+
+  <script src="js/xlsx-lite.js"></script>
+  <script src="js/docentes_atuais.js"></script>
+  <script src="js/cnpq-areas.js"></script>
+  <script src="js/formacao_docentes_embutida.js?v=0.3.8"></script>
+  <script src="js/app.js?v=0.3.8"></script>
+</body>
+</html>

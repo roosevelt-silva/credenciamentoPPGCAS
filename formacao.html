@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PPGCAS · Base de Formação dos Docentes</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap header-grid">
+      <div class="brand">
+        <div class="logo">PPG<br>CAS</div>
+        <div><h1>Base de Formação dos Docentes</h1><p>Editor do CSV institucional · classificação por Grande Área e Área do CNPq</p></div>
+      </div>
+      <a class="btn" href="index.html">← Voltar ao analisador</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card panel">
+      <h2>Editar a base institucional</h2>
+      <p class="sub">O analisador utiliza o arquivo <code>data/formacao_docentes.csv</code>. Nesta página você pode abrir uma cópia local desse mesmo CSV, editar em formulário e salvá-lo novamente sem precisar trabalhar diretamente nas células do Excel/LibreOffice.</p>
+      <div class="actions">
+        <button id="openCsv" class="btn primary" type="button">Abrir CSV para edição</button>
+        <button id="saveCsv" class="btn blue" type="button">Salvar CSV</button>
+        <button id="reloadPublished" class="btn" type="button">Recarregar CSV publicado</button>
+        <a id="githubFileLink" class="btn hidden" target="_blank" rel="noopener">Ver arquivo no GitHub</a>
+      </div>
+      <input id="fallbackFile" type="file" accept=".csv,text/csv" hidden>
+      <p class="note"><b>Chrome/Edge:</b> ao usar <b>Abrir CSV para edição</b>, o navegador mantém acesso ao arquivo escolhido e o botão <b>Salvar no mesmo arquivo</b> grava diretamente nele. Em navegadores que não oferecem essa função, o sistema salva um novo <code>formacao_docentes.csv</code> para substituição no repositório.</p>
+      <div id="csvStatus" class="note">Carregando a base…</div>
+    </section>
+
+    <section class="card panel">
+      <div class="toolbar">
+        <div class="left"><div><h2 style="margin:0">Classificação da formação</h2><p class="sub" style="margin:3px 0 0">Grande Área e Área são selecionadas a partir da Tabela de Áreas do Conhecimento do CNPq.</p></div></div>
+        <div class="right"><a class="btn" target="_blank" rel="noopener" href="https://ppgcas.ufj.edu.br/docentes-e-pesquisadores/">Docentes atuais no PPGCAS</a></div>
+      </div>
+
+      <div class="kpis admin-kpis">
+        <div class="card kpi"><span>Docentes atuais</span><b id="kCurrent">0</b><small>linhas no arquivo</small></div>
+        <div class="card kpi"><span>Área classificada</span><b id="kArea">0/0</b><small>Área do conhecimento</small></div>
+        <div class="card kpi"><span>Grande Área</span><b id="kGreat">0/0</b><small>classificação preenchida</small></div>
+        <div class="card kpi"><span>Limites</span><b id="kLimits" style="font-size:16px">60% / 80%</b><small>Área / Grande Área</small></div>
+      </div>
+
+      <div class="config formation-limits">
+        <div class="field"><label>Limite por Área disciplinar (%)</label><input id="limitArea" type="number" min="0" max="100" step="1" value="60"></div>
+        <div class="field"><label>Limite por Grande Área (%)</label><input id="limitGreat" type="number" min="0" max="100" step="1" value="80"></div>
+      </div>
+      <p id="cnpqInfo" class="note"></p>
+
+      <div class="table-wrap">
+        <table id="formationCsvTable" style="min-width:1180px">
+          <thead><tr><th>Docente</th><th>Categoria</th><th>Linha</th><th>Grande Área (CNPq)</th><th>Área (CNPq)</th><th>Referência</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note"><b>Importante:</b> a tabela do CNPq é usada como referência padronizada para a classificação da formação. A análise dos limites CAPES continua sendo feita pelo Analisador com os valores registrados neste CSV.</p>
+    </section>
+
+    <div class="footer">PPGCAS · base institucional de formação dos docentes.</div>
+  </main>
+  <script src="js/cnpq-areas.js"></script>
+  <script src="js/formacao_docentes_embutida.js?v=0.3.8"></script>
+  <script src="js/formacao-csv-view.js?v=0.3.8"></script>
+</body>
+</html>
