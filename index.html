@@ -58,13 +58,13 @@
         <h2>2. Critérios do escore comparativo</h2>
         <p class="sub">O escore abaixo é um recurso de apoio à decisão e <b>não faz parte da Resolução</b>. Altere os pesos conforme a estratégia do PPGCAS. A elegibilidade regulamentar permanece separada.</p>
         <div class="weights">
-          <div class="field"><label>IndProd (%)</label><input class="weight" id="wInd" type="number" min="0" value="45"></div>
-          <div class="field"><label>Qualidade Qualis (%)</label><input class="weight" id="wQualis" type="number" min="0" value="25"></div>
-          <div class="field"><label>IQTF (%)</label><input class="weight" id="wIQTF" type="number" min="0" value="10"></div>
+          <div class="field"><label>Qualidade Qualis (%)</label><input class="weight" id="wQualis" type="number" min="0" value="75"></div>
+          <div class="field"><label>IndProd (%)</label><input class="weight" id="wInd" type="number" min="0" value="10"></div>
           <div class="field"><label>Orientações (%)</label><input class="weight" id="wOrient" type="number" min="0" value="10"></div>
-          <div class="field"><label>Projetos/captação (%)</label><input class="weight" id="wProj" type="number" min="0" value="10"></div>
+          <div class="field"><label>Projetos/captação (%)</label><input class="weight" id="wProj" type="number" min="0" value="3"></div>
+          <div class="field"><label>IQTF (%)</label><input class="weight" id="wIQTF" type="number" min="0" value="2"></div>
         </div>
-        <p class="note">Qualidade Qualis considera a média dos pesos dos artigos e a proporção nos estratos A1–A4. Projetos/captação usa comparação relativa no grupo, com transformação logarítmica do valor declarado para reduzir o efeito de valores extremos.</p>
+        <p class="note"><b>Normalização do escore:</b> Qualidade Qualis já está em 0–100 (% do IndProd proveniente de A1–A4). O IndProdScore mantém a referência atual: IndProd mínimo = 50 pontos e 2× o mínimo = 100. IQTF e Orientações são normalizados por <b>X/Xmáx × 100</b> dentro do grupo analisado. Projetos e captação também são normalizados pelo maior valor do grupo; a captação usa log(1+R$) antes da normalização para reduzir o efeito de valores extremos. Os pesos informados são normalizados automaticamente pela soma.</p>
       </section>
 
       <section class="card panel">
@@ -82,7 +82,7 @@
           <table id="rankingTable">
             <thead><tr>
               <th class="select-col">Selecionados</th><th>#</th><th>Docente</th><th>Situação</th><th>Pendências</th><th>Escore</th><th>Qualificação</th>
-              <th class="num">IndProd</th><th class="num">IndArt</th><th class="num">A1–A4</th><th class="num">Qualis médio</th><th class="num">IQTF</th><th class="num">Titulados</th><th class="num">Projetos</th><th class="num">Captação</th>
+              <th class="num">IndProd</th><th class="num">IndArt</th><th class="num" title="Percentual do IndProd total proveniente de artigos A1–A4">A1–A4<br><small>% IndProd</small></th><th class="num">Qualis médio</th><th class="num">IQTF</th><th class="num">Titulados</th><th class="num">Projetos</th><th class="num">Captação</th>
             </tr></thead><tbody></tbody>
           </table>
         </div>
@@ -147,6 +147,6 @@
   <script src="js/docentes_atuais.js"></script>
   <script src="js/cnpq-areas.js"></script>
   <script src="js/formacao_docentes_embutida.js?v=0.3.8"></script>
-  <script src="js/app.js?v=0.3.8"></script>
+  <script src="js/app.js?v=0.3.14"></script>
 </body>
 </html>
